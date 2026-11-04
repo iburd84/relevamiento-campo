@@ -1,0 +1,17 @@
+{
+  "name": "Relevamiento de Campo — Alonger",
+  "short_name": "Relevamiento",
+  "description": "Relevamiento de carga de fuego en campo, sin señal",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#009898",
+  "lang": "es-AR",
+  "icons": [
+    { "src": "img/icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "img/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "img/icono-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
