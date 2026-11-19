@@ -652,6 +652,29 @@ async function sendQueue(manual) {
   queue = await cola.todos(); sentList = (await enviados.todos()).sort((a, b) => String(b.enviado).localeCompare(String(a.enviado)));
   render();
 }
+// Actualización: con señal compara la versión publicada con la instalada y ofrece recargar.
+let swReg = null, versionNueva = "";
+async function buscarVersion() {
+  if (!navigator.onLine || versionNueva) return;
+  try {
+    const txt = await (await fetch("js/config.js?v=" + Date.now(), { cache: "no-store" })).text();
+    const v = (txt.match(/version:\s*'([^']+)'/) || [])[1];
+    if (v && v !== CONFIG.version) {
+      versionNueva = v;
+      if (swReg) swReg.update().catch(() => {});
+      const b = document.createElement("button");
+      b.className = "btn primary update-bar"; b.type = "button";
+      b.textContent = `Hay una versión nueva (${v}). Tocá para actualizar`;
+      b.onclick = async () => {
+        b.textContent = "Actualizando…";
+        try { if (swReg) await swReg.update(); } catch { /* sigue igual */ }
+        try { for (const k of await caches.keys()) await caches.delete(k); } catch { /* sin caché */ }
+        location.reload();
+      };
+      document.body.prepend(b);
+    }
+  } catch { /* sin señal */ }
+}
 async function refrescarBases(manual) {
   if (MODO_DEMO || !cuentaActual() || !navigator.onLine || basesEstado === "leyendo") return;
   if (!manual && !basesViejas(bases)) return;
@@ -694,5 +717,9 @@ async function resetDraft() {
   addEventListener("online", () => { render(); sendQueue(false); refrescarBases(false); });
   addEventListener("offline", () => render());
   setInterval(() => { if (document.visibilityState === "visible") sendQueue(false); }, 90000);
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  const ver = $("#ver"); if (ver) ver.textContent = CONFIG.version;
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").then(r => { swReg = r; }).catch(() => {});
+  buscarVersion();
+  addEventListener("online", buscarVersion);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") buscarVersion(); });
 })();
