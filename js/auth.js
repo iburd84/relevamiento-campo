@@ -27,20 +27,21 @@ export async function iniciarAuth() {
 }
 
 export function ingresar() {
-  return app.loginRedirect({ scopes: CONFIG.scopes, prompt: 'select_account' });
+  // Se pide también el permiso de Dataverse en el mismo login (para las listas de bases).
+  return app.loginRedirect({ scopes: CONFIG.scopes, extraScopesToConsent: [CONFIG.dataverse.scope], prompt: 'select_account' });
 }
 
 export function salir() {
   return app.logoutRedirect({ account: cuenta });
 }
 
-export async function obtenerToken(scopes = CONFIG.scopes) {
+export async function obtenerToken(scopes = CONFIG.scopes, interactivo = true) {
   if (!cuenta) throw new Error('No hay sesión iniciada.');
   try {
     const r = await app.acquireTokenSilent({ scopes, account: cuenta });
     return r.accessToken;
   } catch (e) {
-    if (e instanceof msal.InteractionRequiredAuthError && navigator.onLine) {
+    if (interactivo && e instanceof msal.InteractionRequiredAuthError && navigator.onLine) {
       await app.acquireTokenRedirect({ scopes, account: cuenta });
     }
     throw e;

@@ -8,6 +8,7 @@ import { CFG, GENERAL, UNITS, EQ_TYPES, SYS_TYPES, PRESETS, COMP_TYPES, EXT_STAT
 import { iniciarAuth, ingresar, salir, cuentaActual } from './auth.js';
 import { borrador, fotos, cola, enviados, persistir } from './almacen.js';
 import { enviarRelevamiento } from './nube.js';
+import { actualizarBases, basesGuardadas, basesViejas, normalizar } from './bases.js';
 
 const TABS = [["datos", "Datos"], ["sectores", "Sectores"], ["equipos", "Equipos"], ["inventario", "Inventario"], ["extintores", "Extintores"], ["cierre", "Cierre"], ["envios", "Envíos"]];
 
@@ -23,6 +24,8 @@ let sentList = [];         // historial de enviados
 let sending = "";          // survey_id que se está subiendo
 let sendProgress = "";
 let unitLine = "";         // línea elegida en "Equipos tipo"
+let bases = null;          // listas de Dataverse guardadas en el celular
+let basesEstado = "";      // "leyendo" o mensaje de error
 
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -184,6 +187,12 @@ function render() {
 function sel(path, value, options, attrs = "") {
   return `<select data-k="${path}" ${attrs}>${options.map(o => `<option${o === value ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>`;
 }
+const LISTAS = {
+  cliente: () => bases?.clientes || [],
+  operadora: () => bases?.operadoras || [],
+  yacimiento: () => bases?.yacimientos || [],
+  responsable_medicion: () => (bases?.personal || []).map(p => p.nombre),
+};
 function viewDatos() {
   const names = Object.keys(CFG.templates);
   const g = S.general;
@@ -200,8 +209,12 @@ function viewDatos() {
     <div class="row"><label class="btn small" for="plan">Importar proyecto preparado (.cfu.json)</label><input id="plan" type="file" accept=".json,application/json" hidden></div>
   </section>
   <section class="card"><div class="grid two">
-    ${GENERAL.map(([k, l]) => `<label class="f" for="g_${k}">${l}<input id="g_${k}" data-k="general.${k}" value="${esc(g[k] || "")}"${k === "fecha_estudio" ? ' placeholder="dd/mm/aaaa"' : ""}${k === "hora_inicio" ? ' placeholder="hh:mm"' : ""}></label>`).join("")}
-  </div></section>`;
+    ${GENERAL.map(([k, l]) => `<label class="f" for="g_${k}">${l}<input id="g_${k}" data-k="general.${k}" value="${esc(g[k] || "")}"${LISTAS[k] ? ` list="dl_${k}" autocomplete="off"` : ""}${k === "fecha_estudio" ? ' placeholder="dd/mm/aaaa"' : ""}${k === "hora_inicio" ? ' placeholder="hh:mm"' : ""}></label>`).join("")}
+  </div>
+  <p class="hint">${bases ? `Cliente, operadora, yacimiento y responsable se eligen de las bases de Alonger (Dataverse, ${esc(new Date(bases.leido).toLocaleDateString("es-AR"))}). Si no está en la lista, escribilo igual.`
+    : "Sin bases cargadas: iniciá sesión en Envíos con WiFi para traer clientes, operadoras, yacimientos y personal."}</p>
+  ${Object.entries(LISTAS).map(([k, f]) => `<datalist id="dl_${k}">${f().map(v => `<option value="${esc(v)}">`).join("")}</datalist>`).join("")}
+  </section>`;
 }
 function viewSectores() {
   const total = S.sectors.filter(s => s.present).reduce((a, s) => a + sectorArea(s), 0);
@@ -412,6 +425,13 @@ function viewEnvios() {
     ${MODO_DEMO ? `<p class="hint">Modo demostración: no se envía nada.</p>` : user ? `<div class="row"><span>${esc(user.name || user.username)}</span><button class="btn small ghost" type="button" data-act="logout">Cerrar sesión</button></div>`
       : `<div class="row"><button class="btn primary" type="button" data-act="login" ${navigator.onLine ? "" : "disabled"}>Iniciar sesión (Microsoft 365)</button></div>${navigator.onLine ? "" : `<p class="hint">Necesita WiFi la primera vez.</p>`}`}
   </section>
+  <section class="card">
+    <div class="card-head"><p class="card-title">Bases de Alonger (Dataverse)</p><span class="pill ${bases ? "ok" : "warn"}">${bases ? "Cargadas" : "Sin cargar"}</span></div>
+    ${bases ? `<p class="hint">${bases.clientes.length} clientes · ${bases.operadoras.length} operadoras · ${bases.yacimientos.length} yacimientos · ${bases.personal.length} personas. Leídas el ${esc(new Date(bases.leido).toLocaleString("es-AR"))}; quedan en el celular para usar sin señal.</p>`
+      : `<p class="hint">Se traen solas al iniciar sesión con WiFi y se actualizan una vez por día.</p>`}
+    ${basesEstado && basesEstado !== "leyendo" ? `<span class="pill bad">${esc(basesEstado)}</span>` : ""}
+    <div class="row"><button class="btn small" type="button" data-act="bases" ${user && navigator.onLine && basesEstado !== "leyendo" && !MODO_DEMO ? "" : "disabled"}>${basesEstado === "leyendo" ? "Leyendo…" : "Actualizar bases"}</button></div>
+  </section>
   ${notice ? `<div class="msg ${notice[0]}">${esc(notice[1])}</div>` : ""}
   <section class="card">
     <div class="card-head"><p class="card-title">Pendientes de envío</p><span class="pill ${queue.length ? "warn" : "ok"}">${queue.length}</span></div>
@@ -452,6 +472,10 @@ document.addEventListener("input", e => {
     for (const list of [S.items, S.equipment, S.units, S.extinguishers, S.systems]) for (const x of list || []) if (x.sector === old) x.sector = nu;
   }
   setPath(k, e.target.value); touch();
+  if (k === "general.responsable_medicion" && bases) {
+    const p = bases.personal.find(x => normalizar(x.nombre) === normalizar(e.target.value));
+    if (p && p.matricula && !S.general.matricula_medicion) { S.general.matricula_medicion = p.matricula; const el = $("#g_matricula_medicion"); if (el) el.value = p.matricula; }
+  }
   const m = k.match(/^sectors\.(\d+)\.(largo|ancho|area)$/);
   if (m) { const sec = S.sectors[+m[1]]; if (sec.present === null && sectorArea(sec) > 0) sec.present = true; const el = $("#area" + m[1]); if (el) el.textContent = fmt(sectorArea(sec)) + " m²"; }
   const q = k.match(/^equipment\.(\d+)\./);
@@ -496,6 +520,7 @@ document.addEventListener("click", async e => {
   if (a === "finish-yes") await finishSurvey();
   if (a === "send") sendQueue(true);
   if (a === "login") ingresar();
+  if (a === "bases") refrescarBases(true);
   if (a === "logout") salir();
   if (a === "qzip") exportQueuedZip(b.dataset.id, b);
   if (a === "qdel") { pendingConfirm = "qdel:" + b.dataset.id; render(); }
@@ -627,6 +652,14 @@ async function sendQueue(manual) {
   queue = await cola.todos(); sentList = (await enviados.todos()).sort((a, b) => String(b.enviado).localeCompare(String(a.enviado)));
   render();
 }
+async function refrescarBases(manual) {
+  if (MODO_DEMO || !cuentaActual() || !navigator.onLine || basesEstado === "leyendo") return;
+  if (!manual && !basesViejas(bases)) return;
+  basesEstado = "leyendo"; if (tab === "envios") render();
+  try { bases = await actualizarBases(manual); basesEstado = ""; }
+  catch (err) { basesEstado = err.red ? "Sin conexión: se reintenta con WiFi" : (err.message || "No se pudieron leer las bases"); }
+  if (tab === "envios" || (tab === "datos" && !document.activeElement?.matches("input,textarea,select"))) render();
+}
 async function resetDraft() {
   await fotos.borrarTodas(S.survey_id);
   blobs.clear(); urls.clear();
@@ -644,6 +677,7 @@ async function resetDraft() {
       $("#saveState").textContent = "Borrador recuperado";
     } else S = blankSurvey("");
     queue = await cola.todos();
+    bases = await basesGuardadas();
     sentList = (await enviados.todos()).sort((a, b) => String(b.enviado).localeCompare(String(a.enviado)));
     persistir();
   } catch {
@@ -655,8 +689,9 @@ async function resetDraft() {
     try { await iniciarAuth(); } catch { /* sin señal: el login se hace después */ }
     render();
     sendQueue(false);
+    refrescarBases(false);
   }
-  addEventListener("online", () => { render(); sendQueue(false); });
+  addEventListener("online", () => { render(); sendQueue(false); refrescarBases(false); });
   addEventListener("offline", () => render());
   setInterval(() => { if (document.visibilityState === "visible") sendQueue(false); }, 90000);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});

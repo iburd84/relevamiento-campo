@@ -34,6 +34,12 @@ async function tx(almacen, modo, fn) {
   });
 }
 
+// Valores sueltos (ej. "bases": listas de Dataverse para usar sin señal).
+export const kv = {
+  guardar: (clave, v) => tx('kv', 'readwrite', s => s.put(v, clave)),
+  leer: clave => tx('kv', 'readonly', s => s.get(clave)),
+};
+
 export const borrador = {
   guardar: v => tx('kv', 'readwrite', s => s.put(v, 'draft')),
   leer: () => tx('kv', 'readonly', s => s.get('draft')),
