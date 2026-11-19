@@ -1,6 +1,6 @@
 // Guarda la app en el celular para que abra sin señal (igual que Remitos de Campo).
 // Solo archivos propios: el login de Microsoft y SharePoint siempre van por la red.
-const VERSION = 'relevamiento-campo-1.1.0';
+const VERSION = 'relevamiento-campo-1.2.0';
 const ARCHIVOS = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
   'img/logo_alonger.jpg', 'img/icono-192.png', 'img/icono-512.png', 'img/icono-512-maskable.png', 'img/icono-apple-180.png',

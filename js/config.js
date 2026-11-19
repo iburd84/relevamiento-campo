@@ -2,7 +2,7 @@
 // Los relevamientos y las fotos viven en SharePoint (sitio de Remitos de Campo), nunca en este repo.
 
 export const CONFIG = {
-  version: '1.1.0',
+  version: '1.2.0',
 
   // Microsoft Entra: el mismo registro SPA de Remitos de Campo ("Remitos de Campo", tipo SPA).
   // Hay que agregarle la URI de redirección https://iburd84.github.io/relevamiento-campo/

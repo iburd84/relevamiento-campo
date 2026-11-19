@@ -209,7 +209,7 @@ function viewDatos() {
     <div class="row"><label class="btn small" for="plan">Importar proyecto preparado (.cfu.json)</label><input id="plan" type="file" accept=".json,application/json" hidden></div>
   </section>
   <section class="card"><div class="grid two">
-    ${GENERAL.map(([k, l]) => `<label class="f" for="g_${k}">${l}<input id="g_${k}" data-k="general.${k}" value="${esc(g[k] || "")}"${LISTAS[k] ? ` list="dl_${k}" autocomplete="off"` : ""}${k === "fecha_estudio" ? ' placeholder="dd/mm/aaaa"' : ""}${k === "hora_inicio" ? ' placeholder="hh:mm"' : ""}></label>`).join("")}
+    ${GENERAL.map(([k, l]) => `<label class="f" for="g_${k}">${l}<input id="g_${k}" data-k="general.${k}" value="${esc(g[k] || "")}"${LISTAS[k] ? ` list="dl_${k}" autocomplete="off"` : ""}${k === "fecha_estudio" ? ' placeholder="dd/mm/aaaa"' : ""}${k === "hora_inicio" ? ' placeholder="hh:mm"' : ""}${k === "registro" ? ' inputmode="numeric" placeholder="ej. 4521 (opcional)"' : ""}></label>`).join("")}
   </div>
   <p class="hint">${bases ? `Cliente, operadora, yacimiento y responsable se eligen de las bases de Alonger (Dataverse, ${esc(new Date(bases.leido).toLocaleDateString("es-AR"))}). Si no está en la lista, escribilo igual.`
     : "Sin bases cargadas: iniciá sesión en Envíos con WiFi para traer clientes, operadoras, yacimientos y personal."}</p>
